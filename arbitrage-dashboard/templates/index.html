@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Arbitrage Monitor</title>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #1e293b;
+            --light: #f9fafb;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f1f5f9;
+            color: var(--dark);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: var(--dark);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-start {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .btn-stop {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: auto auto;
+            gap: 20px;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .price-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background-color: #f8fafc;
+        }
+        
+        .price-label {
+            font-weight: 500;
+        }
+        
+        .price-value {
+            font-weight: 700;
+        }
+        
+        .spread-card {
+            grid-column: span 3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .spread-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .arbitrage-alert {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            font-weight: 600;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .chart-container {
+            grid-column: span 3;
+            height: 300px;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 6px;
+            font-weight: 500;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
+        .status.active {
+            color: var(--success);
+        }
+        
+        .status.inactive {
+            color: var(--dark);
+        }
+        
+        .best-opportunity {
+            grid-column: span 3;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .best-details {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .best-item {
+            background-color: #f8fafc;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        
+        .best-label {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        
+        .best-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        
+        .blinking {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Stock Arbitrage Dashboard</h1>
+            <div class="controls">
+                <button id="startBtn" class="btn-start">
+                    <i class="fas fa-play"></i> Start Monitoring
+                </button>
+                <button id="stopBtn" class="btn-stop">
+                    <i class="fas fa-stop"></i> Stop
+                </button>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <span>NSE Price</span>
+                    <i class="fas fa-building"></i>
+                </div>
+                <div class="card-content">
+                    <div class="price-display">
+                        <span class="price-label">Current</span>
+                        <span id="nsePrice" class="price-value">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span>BSE Price</span>
+                    <i class="fas fa-landmark"></i>
+                </div>
+                <div class="card-content">
+                    <div class="price-display">
+                        <span class="price-label">Current</span>
+                        <span id="bsePrice" class="price-value">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <span>Price Difference</span>
+                    <i class="fas fa-exchange-alt"></i>
+                </div>
+                <div class="card-content">
+                    <div class="price-display">
+                        <span class="price-label">Absolute Diff</span>
+                        <span id="priceDiff" class="price-value">₹0.00</span>
+                    </div>
+                    <div class="status" id="monitoringStatus">
+                        <i class="fas fa-circle"></i> Monitoring Inactive
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card spread-card">
+                <div class="card-header">
+                    <span>Current Spread</span>
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div id="spreadValue" class="spread-value">0.0000%</div>
+                <div id="arbitrageAlert" class="arbitrage-alert hidden">
+                    <i class="fas fa-bell"></i>
+                    <span>Arbitrage Opportunity Detected!</span>
+                </div>
+            </div>
+            
+            <div class="card chart-container">
+                <div class="card-header">
+                    <span>Spread History</span>
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <canvas id="spreadChart"></canvas>
+            </div>
+            
+            <div class="card best-opportunity">
+                <div class="card-header">
+                    <span>Best Arbitrage Opportunity</span>
+                    <i class="fas fa-award"></i>
+                </div>
+                <div class="best-details">
+                    <div class="best-item">
+                        <div class="best-label">Spread</div>
+                        <div id="bestSpread" class="best-value">0.0000%</div>
+                    </div>
+                    <div class="best-item">
+                        <div class="best-label">NSE Price</div>
+                        <div id="bestNse" class="best-value">₹0.00</div>
+                    </div>
+                    <div class="best-item">
+                        <div class="best-label">BSE Price</div>
+                        <div id="bestBse" class="best-value">₹0.00</div>
+                    </div>
+                    <div class="best-item">
+                        <div class="best-label">Timestamp</div>
+                        <div id="bestTime" class="best-value">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const nsePrice = document.getElementById('nsePrice');
+        const bsePrice = document.getElementById('bsePrice');
+        const priceDiff = document.getElementById('priceDiff');
+        const spreadValue = document.getElementById('spreadValue');
+        const arbitrageAlert = document.getElementById('arbitrageAlert');
+        const monitoringStatus = document.getElementById('monitoringStatus');
+        const bestSpread = document.getElementById('bestSpread');
+        const bestNse = document.getElementById('bestNse');
+        const bestBse = document.getElementById('bestBse');
+        const bestTime = document.getElementById('bestTime');
+        
+        // Chart initialization
+        const ctx = document.getElementById('spreadChart').getContext('2d');
+        const spreadChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Spread %',
+                    data: [],
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Spread: ${context.raw.toFixed(4)}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toFixed(4) + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxTicksLimit: 10
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Global variables
+        let isMonitoring = false;
+        let dataFetchInterval = null;
+        
+        // Start monitoring
+        startBtn.addEventListener('click', async () => {
+            if (isMonitoring) return;
+            
+            try {
+                const response = await fetch('/api/start_monitoring', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.status === 'started' || data.status === 'already_running') {
+                    isMonitoring = true;
+                    monitoringStatus.innerHTML = '<i class="fas fa-circle active"></i> Monitoring Active';
+                    monitoringStatus.classList.add('active');
+                    monitoringStatus.classList.remove('inactive');
+                    
+                    // Start fetching data periodically
+                    startDataFetching();
+                }
+            } catch (error) {
+                console.error('Error starting monitoring:', error);
+            }
+        });
+        
+        // Stop monitoring
+        stopBtn.addEventListener('click', async () => {
+            if (!isMonitoring) return;
+            
+            try {
+                const response = await fetch('/api/stop_monitoring', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.status === 'stopped') {
+                    isMonitoring = false;
+                    monitoringStatus.innerHTML = '<i class="fas fa-circle"></i> Monitoring Inactive';
+                    monitoringStatus.classList.remove('active');
+                    monitoringStatus.classList.add('inactive');
+                    
+                    // Stop fetching data
+                    if (dataFetchInterval) {
+                        clearInterval(dataFetchInterval);
+                        dataFetchInterval = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error stopping monitoring:', error);
+            }
+        });
+        
+        // Fetch and update data
+        function startDataFetching() {
+            // Clear any existing interval
+            if (dataFetchInterval) {
+                clearInterval(dataFetchInterval);
+            }
+            
+            // Immediately fetch data
+            fetchData();
+            
+            // Set up interval for periodic updates
+            dataFetchInterval = setInterval(fetchData, 1000);
+        }
+        
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+        
+        function updateDashboard(data) {
+            // Update current data
+            if (data.current) {
+                nsePrice.textContent = `₹${data.current.nse_price.toFixed(2)}`;
+                bsePrice.textContent = `₹${data.current.bse_price.toFixed(2)}`;
+                priceDiff.textContent = `₹${data.current.diff.toFixed(2)}`;
+                spreadValue.textContent = `${data.current.spread_percent.toFixed(4)}%`;
+                
+                // Show/hide arbitrage alert
+                if (data.current.arbitrage_opportunity) {
+                    arbitrageAlert.classList.remove('hidden');
+                    spreadValue.classList.add('blinking');
+                } else {
+                    arbitrageAlert.classList.add('hidden');
+                    spreadValue.classList.remove('blinking');
+                }
+            }
+            
+            // Update best opportunity
+            if (data.best && data.best.timestamp) {
+                bestSpread.textContent = `${data.best.spread_percent.toFixed(4)}%`;
+                bestNse.textContent = `₹${data.best.nse_price.toFixed(2)}`;
+                bestBse.textContent = `₹${data.best.bse_price.toFixed(2)}`;
+                
+                // Format timestamp to readable format
+                const timestamp = new Date(data.best.timestamp.replace(' ', 'T'));
+                bestTime.textContent = timestamp.toLocaleTimeString();
+            }
+            
+            // Update chart with historical data
+            if (data.historical && data.historical.length > 0) {
+                // Get last 30 data points for the chart
+                const chartData = data.historical.slice(-30);
+                
+                // Update chart labels and data
+                spreadChart.data.labels = chartData.map(item => {
+                    const timestamp = new Date(item.timestamp.replace(' ', 'T'));
+                    return timestamp.toLocaleTimeString();
+                });
+                
+                spreadChart.data.datasets[0].data = chartData.map(item => item.spread_percent);
+                
+                // Update chart
+                spreadChart.update();
+            }
+        }
+        
+        // Initial setup
+        function init() {
+            monitoringStatus.innerHTML = '<i class="fas fa-circle"></i> Monitoring Inactive';
+            monitoringStatus.classList.add('inactive');
+        }
+        
+        // Initialize on page load
+        init();
+    </script>
+</body>
+</html>
